@@ -49,7 +49,7 @@ func (as *apiService) NewOrder(or NewOrderRequest) (*ProcessedOrder, error) {
 	}
 	textRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to read response from Ticker/24hr")
+		return nil, errors.Wrap(err, "unable to read order response")
 	}
 	defer res.Body.Close()
 

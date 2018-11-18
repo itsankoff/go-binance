@@ -290,99 +290,46 @@ func (as *apiService) Ticker24(tr TickerRequest) (*Ticker24, error) {
 		as.handleError(textRes)
 	}
 
-	rawTicker24 := struct {
-		PriceChange        string  `json:"priceChange"`
-		PriceChangePercent string  `json:"priceChangePercent"`
-		WeightedAvgPrice   string  `json:"weightedAvgPrice"`
-		PrevClosePrice     string  `json:"prevClosePrice"`
-		LastPrice          string  `json:"lastPrice"`
-		BidPrice           string  `json:"bidPrice"`
-		AskPrice           string  `json:"askPrice"`
-		OpenPrice          string  `json:"openPrice"`
-		HighPrice          string  `json:"highPrice"`
-		LowPrice           string  `json:"lowPrice"`
-		Volume             string  `json:"volume"`
-		OpenTime           float64 `json:"openTime"`
-		CloseTime          float64 `json:"closeTime"`
-		FirstID            int
-		LastID             int
-		Count              int
-	}{}
-	if err := json.Unmarshal(textRes, &rawTicker24); err != nil {
+	var raw rawTicker24
+	if err := json.Unmarshal(textRes, &raw); err != nil {
 		return nil, errors.Wrap(err, "rawTicker24 unmarshal failed")
 	}
 
-	pc, err := strconv.ParseFloat(rawTicker24.PriceChange, 64)
+	return as.parseTicker24(&raw)
+}
+
+func (as *apiService) Ticker24All() ([]*Ticker24, error) {
+	res, err := as.request("GET", "api/v1/ticker/24hr", nil, false, false)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.PriceChange")
+		return nil, err
 	}
-	pcPercent, err := strconv.ParseFloat(rawTicker24.PriceChangePercent, 64)
+	textRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.PriceChangePercent")
+		return nil, errors.Wrap(err, "unable to read response from Ticker/24hr")
 	}
-	wap, err := strconv.ParseFloat(rawTicker24.WeightedAvgPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.WeightedAvgPrice")
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		as.handleError(textRes)
 	}
-	pcp, err := strconv.ParseFloat(rawTicker24.PrevClosePrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.PrevClosePrice")
+
+	var rawTicker24Slice []rawTicker24
+	if err := json.Unmarshal(textRes, &rawTicker24Slice); err != nil {
+		return nil, errors.Wrap(err, "rawTicker24Slice unmarshal failed")
 	}
-	lastPrice, err := strconv.ParseFloat(rawTicker24.LastPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.LastPrice")
+
+	var output []*Ticker24
+	for _, raw := range rawTicker24Slice {
+		ticker24, err := as.parseTicker24(&raw)
+		if err != nil {
+			as.Logger.Log(err)
+			continue
+		}
+
+		output = append(output, ticker24)
 	}
-	bp, err := strconv.ParseFloat(rawTicker24.BidPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.BidPrice")
-	}
-	ap, err := strconv.ParseFloat(rawTicker24.AskPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.AskPrice")
-	}
-	op, err := strconv.ParseFloat(rawTicker24.OpenPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.OpenPrice")
-	}
-	hp, err := strconv.ParseFloat(rawTicker24.HighPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.HighPrice")
-	}
-	lowPrice, err := strconv.ParseFloat(rawTicker24.LowPrice, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.LowPrice")
-	}
-	vol, err := strconv.ParseFloat(rawTicker24.Volume, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.Volume")
-	}
-	ot, err := timeFromUnixTimestampFloat(rawTicker24.OpenTime)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.OpenTime")
-	}
-	ct, err := timeFromUnixTimestampFloat(rawTicker24.CloseTime)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse Ticker24.CloseTime")
-	}
-	t24 := &Ticker24{
-		PriceChange:        pc,
-		PriceChangePercent: pcPercent,
-		WeightedAvgPrice:   wap,
-		PrevClosePrice:     pcp,
-		LastPrice:          lastPrice,
-		BidPrice:           bp,
-		AskPrice:           ap,
-		OpenPrice:          op,
-		HighPrice:          hp,
-		LowPrice:           lowPrice,
-		Volume:             vol,
-		OpenTime:           ot,
-		CloseTime:          ct,
-		FirstID:            rawTicker24.FirstID,
-		LastID:             rawTicker24.LastID,
-		Count:              rawTicker24.Count,
-	}
-	return t24, nil
+
+	return output, err
 }
 
 func (as *apiService) TickerAllPrices() ([]*PriceTicker, error) {
@@ -479,4 +426,83 @@ func (as *apiService) TickerAllBooks() ([]*BookTicker, error) {
 		})
 	}
 	return btc, nil
+}
+
+func (as *apiService) parseTicker24(raw *rawTicker24) (*Ticker24, error) {
+	pc, err := strconv.ParseFloat(raw.PriceChange, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.PriceChange")
+	}
+	pcPercent, err := strconv.ParseFloat(raw.PriceChangePercent, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.PriceChangePercent")
+	}
+	wap, err := strconv.ParseFloat(raw.WeightedAvgPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.WeightedAvgPrice")
+	}
+	pcp, err := strconv.ParseFloat(raw.PrevClosePrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.PrevClosePrice")
+	}
+	lastPrice, err := strconv.ParseFloat(raw.LastPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.LastPrice")
+	}
+	bp, err := strconv.ParseFloat(raw.BidPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.BidPrice")
+	}
+	ap, err := strconv.ParseFloat(raw.AskPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.AskPrice")
+	}
+	op, err := strconv.ParseFloat(raw.OpenPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.OpenPrice")
+	}
+	hp, err := strconv.ParseFloat(raw.HighPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.HighPrice")
+	}
+	lowPrice, err := strconv.ParseFloat(raw.LowPrice, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.LowPrice")
+	}
+	vol, err := strconv.ParseFloat(raw.Volume, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.Volume")
+	}
+	volQuote, err := strconv.ParseFloat(raw.QuoteVolume, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.QuoteVolume")
+	}
+	ot, err := timeFromUnixTimestampFloat(raw.OpenTime)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.OpenTime")
+	}
+	ct, err := timeFromUnixTimestampFloat(raw.CloseTime)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot parse Ticker24.CloseTime")
+	}
+	return &Ticker24{
+		Symbol:             raw.Symbol,
+		PriceChange:        pc,
+		PriceChangePercent: pcPercent,
+		WeightedAvgPrice:   wap,
+		PrevClosePrice:     pcp,
+		LastPrice:          lastPrice,
+		BidPrice:           bp,
+		AskPrice:           ap,
+		OpenPrice:          op,
+		HighPrice:          hp,
+		LowPrice:           lowPrice,
+		Volume:             vol,
+		QuoteVolume:        volQuote,
+		OpenTime:           ot,
+		CloseTime:          ct,
+		FirstID:            raw.FirstID,
+		LastID:             raw.LastID,
+		Count:              raw.Count,
+	}, nil
 }

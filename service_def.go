@@ -22,6 +22,7 @@ type Service interface {
 	AggTrades(atr AggTradesRequest) ([]*AggTrade, error)
 	Klines(kr KlinesRequest) ([]*Kline, error)
 	Ticker24(tr TickerRequest) (*Ticker24, error)
+	Ticker24All() ([]*Ticker24, error)
 	TickerAllPrices() ([]*PriceTicker, error)
 	TickerAllBooks() ([]*BookTicker, error)
 
@@ -54,6 +55,27 @@ type apiService struct {
 	Signer Signer
 	Logger log.Logger
 	Ctx    context.Context
+}
+
+type rawTicker24 struct {
+	Symbol             string  `json:"symbol"`
+	PriceChange        string  `json:"priceChange"`
+	PriceChangePercent string  `json:"priceChangePercent"`
+	WeightedAvgPrice   string  `json:"weightedAvgPrice"`
+	PrevClosePrice     string  `json:"prevClosePrice"`
+	LastPrice          string  `json:"lastPrice"`
+	BidPrice           string  `json:"bidPrice"`
+	AskPrice           string  `json:"askPrice"`
+	OpenPrice          string  `json:"openPrice"`
+	HighPrice          string  `json:"highPrice"`
+	LowPrice           string  `json:"lowPrice"`
+	Volume             string  `json:"volume"`
+	QuoteVolume        string  `json:"quoteVolume"`
+	OpenTime           float64 `json:"openTime"`
+	CloseTime          float64 `json:"closeTime"`
+	FirstID            int
+	LastID             int
+	Count              int
 }
 
 // NewAPIService creates instance of Service.
